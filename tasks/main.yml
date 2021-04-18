@@ -1,0 +1,66 @@
+---
+# tasks file for k8s_slave
+- name: "Installing docker & iproute-tc"
+  package:
+          name:
+                  - docker
+                  - iproute-tc
+          state: present
+ 
+- name: "Configure yum for repo for kubernetes"
+  yum_repository:
+          name: kubernetes
+          description: yum for k8s
+          baseurl: https://packages.cloud.google.com/yum/repos/kubernetes-el7-\$basearch
+          enabled: yes
+          gpgcheck: 1
+          repo_gpgcheck: 1
+          gpgkey: https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+    
+- name: "Install kubelet, kubectl & kubeadm softwares"
+  yum:
+          name:
+                  - kubelet
+                  - kubeadm
+                  - kubectl
+          state: present
+
+- name: "Enabling docker & kubenetes services"
+  service:
+          name: "{{ item }}"
+          state: started
+          enabled: yes
+  loop: 
+        - kubelet
+        - docker
+
+- name: "Pulling images"
+  shell: "kubeadm config images pull"
+
+- name: "Configure the daemon.json file"
+  copy:
+          dest: "/etc/docker/daemon.json"
+          src: "daemon.json"
+
+- name: "Restart the docker services"
+  service:
+          name: docker
+          state: restarted
+
+- name: "configure the iproute-tc"
+  copy:
+          dest: /etc/sysctl.d/iptables-1.conf
+          src: iptables-1.conf
+
+- name: "Show system drive"
+  shell: "sysctl --system"
+
+- name: "copy token to worker"
+  copy:
+          src: "/task19/token.txt"
+          dest: "/token.txt"
+
+- name: "join master node"
+  command: "bash /token.txt"
+  ignore_errors: yes
+  register: init
